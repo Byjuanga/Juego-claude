@@ -30,7 +30,7 @@ Se puede jugar **solo contra bots** o **online con hasta 8 personas**. Basta con
 - 🎵 **Música y efectos de sonido** generados en el propio navegador.
 - 💬 **Chat** en la partida (tecla T) y en la sala de espera.
 - 🗺️ Minimapa, lista de bajas, clasificación y avisos de racha («¡Doble eliminación!»).
-- 🎚️ Calidad gráfica ajustable para ordenadores menos potentes.
+- 🥔 **Calidad gráfica ajustable**, incluido el modo «Patata» para ordenadores antiguos sin tarjeta gráfica.
 
 ## Controles
 

@@ -25,10 +25,26 @@ function measureHeight(root) {
   return (box.max.y - box.min.y) || 1;
 }
 
+// Calidad recomendada según la tarjeta gráfica (solo se usa la primera vez)
+export function detectQuality() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+    if (!gl) return 'patata';
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    if (/swiftshader|llvmpipe|softpipe|software/i.test(name)) return 'patata';
+    if (/Intel/i.test(name) && /(^|[^U])HD Graphics|Sandybridge|Ivybridge|Haswell|Bay ?Trail|GMA/i.test(name)) return 'patata';
+    if (/Intel/i.test(name)) return 'baja'; // UHD / Iris integradas
+    return 'alta';
+  } catch (e) { return 'media'; }
+}
+
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas, quality = 'alta') {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    this.aa = quality !== 'patata';
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: this.aa, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -36,7 +52,10 @@ export class Renderer {
     this.scene.background = new THREE.Color('#05060d');
     this.scene.fog = new THREE.Fog('#05060d', 45, 90);
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.envTex;
+    this.particleScale = 1;
+    this.lowMats = new WeakMap();
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.1, 200);
     this.camera.position.set(0, 40, 30);
     this.camTarget = new THREE.Vector3();
@@ -57,7 +76,7 @@ export class Renderer {
 
     this.buildArena();
     this.buildParticles();
-    this.setQuality('alta');
+    this.setQuality(quality);
     window.addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -72,15 +91,46 @@ export class Renderer {
     }
   }
 
+  // alta: todo · media: resolución normal · baja: sin sombras ni brillo
+  // patata: además menos resolución, materiales simples, sin luces extra ni reflejos
+  // Devuelve true si el cambio completo necesita recargar la página (suavizado de bordes).
   setQuality(q) {
     this.quality = q;
+    const potato = q === 'patata', cheap = q === 'baja' || potato;
     const dpr = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(q === 'alta' ? Math.min(dpr, 2) : 1);
-    this.renderer.shadowMap.enabled = q !== 'baja';
-    this.sun.castShadow = q !== 'baja';
-    this.useBloom = q !== 'baja';
+    this.renderer.setPixelRatio(q === 'alta' ? Math.min(dpr, 2) : potato ? 0.6 : 1);
+    this.renderer.shadowMap.enabled = !cheap;
+    this.sun.castShadow = !cheap;
+    this.useBloom = !cheap;
+    for (const l of this.cornerLights) l.visible = !potato;
+    this.hemi.intensity = potato ? 1.7 : 0.9; // compensa las luces que se quitan
+    this.scene.environment = potato ? null : this.envTex;
+    this.particleScale = potato ? 0.35 : cheap ? 0.6 : 1;
+    this.scene.traverse(o => { if (o.isMesh) potato ? this.toLow(o) : this.toHigh(o); });
     this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
     this.resize();
+    return this.aa !== !potato;
+  }
+
+  // Cambia un material realista (PBR) por uno mucho más barato de dibujar
+  toLow(o) {
+    const m = o.material;
+    if (!m || !m.isMeshStandardMaterial) return;
+    let low = this.lowMats.get(m);
+    if (!low) {
+      low = new THREE.MeshLambertMaterial({
+        color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity,
+        transparent: m.transparent, opacity: m.opacity, side: m.side,
+      });
+      this.lowMats.set(m, low);
+    }
+    o.userData.hiMat = m;
+    o.material = low;
+  }
+  toHigh(o) {
+    if (!o.userData.hiMat) return;
+    o.material = o.userData.hiMat;
+    delete o.userData.hiMat;
   }
 
   resize() {
@@ -95,15 +145,18 @@ export class Renderer {
   // ---------- Arena ----------
   buildArena() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight('#7c86ff', '#120a1e', 0.9));
+    this.hemi = new THREE.HemisphereLight('#7c86ff', '#120a1e', 0.9);
+    s.add(this.hemi);
     const sun = new THREE.DirectionalLight('#ffffff', 1.4);
     sun.position.set(18, 40, 12);
     sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera; sc.left = sc.bottom = -36; sc.right = sc.top = 36; sc.near = 5; sc.far = 90;
     sun.shadow.bias = -0.0005;
     s.add(sun); this.sun = sun;
+    this.cornerLights = [];
     for (const [x, z, c] of [[-HALF, -HALF, '#ff2bd6'], [HALF, HALF, '#00e5ff'], [HALF, -HALF, '#8f5bff'], [-HALF, HALF, '#00e5ff']]) {
       const l = new THREE.PointLight(c, 25, 30, 2); l.position.set(x * 0.8, 6, z * 0.8); s.add(l);
+      this.cornerLights.push(l);
     }
 
     // suelo con rejilla dibujada en un canvas
@@ -192,6 +245,7 @@ export class Renderer {
   }
 
   burst(x, y, z, color, n, speed = 6, up = 3) {
+    n = Math.max(1, Math.round(n * this.particleScale));
     const c = new THREE.Color(color);
     for (let k = 0; k < n; k++) {
       const i = this.pIdx = (this.pIdx + 1) % this.pN;
@@ -272,6 +326,7 @@ export class Renderer {
       if (k === 'death') { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
       actions[k] = a;
     }
+    if (this.quality === 'patata') root.traverse(o => { if (o.isMesh) this.toLow(o); });
     this.scene.add(root);
     const av = { root, model, gun, ring, shield, label, cv, tex, mixer, actions, cur: null, color: info.color, name: info.name, hp: -1, alive: true, me: false, flash: 0 };
     this.play(av, 'idle');
@@ -305,7 +360,12 @@ export class Renderer {
   removeAvatar(id) {
     const av = this.avatars.get(id); if (!av) return;
     this.scene.remove(av.root);
-    av.root.traverse(o => { if (o.isMesh || o.isSprite) { o.geometry && o.geometry.dispose(); o.material.dispose && o.material.dispose(); } });
+    av.root.traverse(o => {
+      if (!o.isMesh && !o.isSprite) return;
+      o.geometry && o.geometry.dispose();
+      o.material.dispose && o.material.dispose();
+      if (o.userData.hiMat) o.userData.hiMat.dispose();
+    });
     av.tex.dispose();
     this.avatars.delete(id);
   }

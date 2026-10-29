@@ -81,9 +81,10 @@
       <div class="card">
         <h3>Opciones</h3>
         <div class="opt"><label for="quality">Gráficos</label>
-          <select id="quality"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+          <select id="quality"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option><option value="patata">Patata (PC antiguo)</option></select></div>
         <div class="opt"><label for="volume">Volumen</label><input type="range" id="volume" min="0" max="1" step="0.05"></div>
         <div class="opt"><label for="music">Música</label><input type="checkbox" id="music"></div>
+        <div class="opt"><label for="showFps">Mostrar FPS</label><input type="checkbox" id="showFps"></div>
       </div>
     </div>
   </div>
@@ -175,8 +176,9 @@
   <div class="panel">
     <h2>Pausa</h2>
     <div class="opt"><label for="quality2">Gráficos</label>
-      <select id="quality2"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+      <select id="quality2"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option><option value="patata">Patata (PC antiguo)</option></select></div>
     <div class="opt"><label for="volume2">Volumen</label><input type="range" id="volume2" min="0" max="1" step="0.05"></div>
+    <div class="opt"><label for="showFps2">Mostrar FPS</label><input type="checkbox" id="showFps2"></div>
     <div class="row">
       <button class="btn ghost" id="btnLeave">Abandonar</button>
       <button class="btn primary" id="btnResume">Continuar</button>
@@ -198,6 +200,7 @@
   </div>
 </div>
 
+<div id="fps" hidden></div>
 <div id="toast"></div>
 <script type="module" src="src/main.js"></script>
 </body>

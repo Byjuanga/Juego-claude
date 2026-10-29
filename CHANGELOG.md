@@ -1,5 +1,13 @@
 # Historial de cambios
 
+## 1.2.0: Gráficos Patata
+
+- Nueva calidad gráfica «Patata» para ordenadores antiguos sin tarjeta gráfica: menos resolución,
+  materiales simples, sin sombras, brillo, luces extra ni reflejos, y menos partículas.
+- La primera vez, el juego elige la calidad según la tarjeta gráfica del ordenador.
+- Opción para mostrar los FPS.
+- Aviso para bajar los gráficos si el juego va a tirones.
+
 ## 1.1.0: Chat
 
 - Chat en la partida: se abre con T o Enter, se envía con Enter y se cancela con Esc.

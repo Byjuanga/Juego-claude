@@ -148,6 +148,7 @@ table#scoreTable,table#endTable{border-collapse:collapse;width:100%;font-size:19
 tr.me td{background:#ffffff0d}
 td .dot{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c);box-shadow:0 0 8px var(--c);margin-right:10px}
 
+#fps{position:fixed;right:18px;bottom:226px;z-index:6;font-family:var(--display);font-size:12px;letter-spacing:.08em;color:var(--green);background:#0a0c1ccc;border-radius:6px;padding:3px 8px;pointer-events:none;font-variant-numeric:tabular-nums}
 #toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,30px);background:#141836;border:1px solid var(--line);padding:12px 18px;border-radius:10px;
   font-weight:700;opacity:0;transition:.25s;z-index:20;pointer-events:none;max-width:90vw;text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}

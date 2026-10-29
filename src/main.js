@@ -5,7 +5,7 @@ import {
   BULLET_R, MAX_HP, CHARACTERS,
 } from './config.js';
 import { Game, moveCircle, pointBlocked, F } from './sim.js';
-import { Renderer } from './render.js';
+import { Renderer, detectQuality } from './render.js';
 import { initAudio, sfx, setVolume, setMusic, startMusic, stopMusic } from './audio.js';
 
 const PREFIX = 'neonarena-v1-';
@@ -23,11 +23,13 @@ const prefs = {
   bots: +(store('na.bots') || 5),
   diff: store('na.diff') || 'normal',
   kills: +(store('na.kills') || 15),
-  quality: store('na.quality') || 'alta',
+  quality: store('na.quality') || detectQuality(),
+  fps: store('na.fps') === '1',
   volume: store('na.volume') != null ? +store('na.volume') : 0.6,
   music: store('na.music') !== '0',
 };
 function savePrefs() { for (const [k, v] of Object.entries(prefs)) store('na.' + k, typeof v === 'boolean' ? (v ? '1' : '0') : v); }
+const QUALITY_NAMES = { alta: 'Alta', media: 'Media', baja: 'Baja', patata: 'Patata' };
 const myName = () => ($('name').value.trim() || 'Jugador').slice(0, 14);
 
 // ================== Estado de sesión ==================
@@ -725,12 +727,21 @@ function wireMenus() {
   $('swatches').onclick = e => { const b = e.target.closest('button'); if (!b) return; prefs.color = +b.dataset.i; savePrefs(); renderSwatches(); };
   for (const id of ['quality', 'quality2']) {
     $(id).value = prefs.quality;
-    $(id).onchange = () => { prefs.quality = $(id).value; $('quality').value = $('quality2').value = prefs.quality; renderer.setQuality(prefs.quality); savePrefs(); };
+    $(id).onchange = () => {
+      prefs.quality = $(id).value; $('quality').value = $('quality2').value = prefs.quality; savePrefs();
+      const reload = renderer.setQuality(prefs.quality);
+      toast('Gráficos: ' + QUALITY_NAMES[prefs.quality] + (reload ? '. Recarga la página para aplicarlo del todo.' : ''));
+    };
   }
   for (const id of ['volume', 'volume2']) {
     $(id).value = prefs.volume;
     $(id).oninput = () => { prefs.volume = +$(id).value; $('volume').value = $('volume2').value = prefs.volume; setVolume(prefs.volume); savePrefs(); };
   }
+  for (const id of ['showFps', 'showFps2']) {
+    $(id).checked = prefs.fps;
+    $(id).onchange = () => { prefs.fps = $(id).checked; $('showFps').checked = $('showFps2').checked = prefs.fps; $('fps').hidden = !prefs.fps; savePrefs(); };
+  }
+  $('fps').hidden = !prefs.fps;
   $('music').checked = prefs.music;
   $('music').onchange = () => { prefs.music = $('music').checked; setMusic(prefs.music); savePrefs(); };
   setVolume(prefs.volume); setMusic(prefs.music);
@@ -778,9 +789,28 @@ function wireMenus() {
 
 // ================== Bucle principal ==================
 let lastFrame = performance.now();
+const perf = { frames: 0, t: 0, slow: 0, warned: false };
+function trackFps(rawDt) {
+  perf.frames++; perf.t += rawDt;
+  if (perf.t < 1) return;
+  const fps = Math.round(perf.frames / perf.t);
+  perf.frames = 0; perf.t = 0;
+  if (prefs.fps) $('fps').textContent = fps + ' FPS';
+  // si va a tirones varios segundos seguidos, sugerir bajar los gráficos
+  if (S.phase === 'playing' && !document.hidden) {
+    perf.slow = fps < 28 ? perf.slow + 1 : 0;
+    const lower = { alta: 'Media', media: 'Baja', baja: 'Patata' }[prefs.quality];
+    if (perf.slow >= 5 && lower && !perf.warned) {
+      perf.warned = true;
+      toast(`¿Va a tirones (${fps} FPS)? Pulsa Esc y pon los gráficos en «${lower}».`);
+    }
+  }
+}
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now;
+  const rawDt = (now - lastFrame) / 1000;
+  const dt = Math.min(0.05, rawDt); lastFrame = now;
+  trackFps(rawDt);
   if (S.phase === 'playing' || S.phase === 'over') {
     if (S.mode === 'guest') guestFrame(dt);
     else if (S.game) viewFromGame();
@@ -801,8 +831,8 @@ function frame(now) {
 
 // ================== Arranque ==================
 async function boot() {
-  renderer = new Renderer($('scene'));
-  renderer.setQuality(prefs.quality);
+  savePrefs();
+  renderer = new Renderer($('scene'), prefs.quality);
   try {
     await renderer.load(f => { $('loadBar').style.width = Math.round(f * 100) + '%'; });
   } catch (e) {
