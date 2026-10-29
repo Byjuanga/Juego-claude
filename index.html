@@ -2,812 +2,185 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#05060f">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Neón Duelo</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
-<style>
-  :root{
-    --bg:#05060f; --panel:#0d1024; --line:#1c2147; --text:#e8ebff; --muted:#8a90c0;
-    --cyan:#00f0ff; --pink:#ff2bd6; --yellow:#ffe600; --green:#3dff6e;
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;
-    overscroll-behavior:none;user-select:none;-webkit-user-select:none}
-  button,input{font:inherit;color:inherit}
-  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
-    padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));overflow-y:auto}
-  .screen.active{display:flex}
-  .card{width:100%;max-width:420px;margin:auto 0;display:flex;flex-direction:column;gap:14px}
-  h1{margin:8px 0 0;text-align:center;font-size:44px;letter-spacing:2px;line-height:1;font-weight:900;
-    color:#fff;text-shadow:0 0 8px var(--cyan),0 0 22px var(--cyan),0 0 40px var(--pink)}
-  h1 span{color:var(--pink);text-shadow:0 0 8px var(--pink),0 0 24px var(--pink)}
-  .sub{text-align:center;color:var(--muted);margin:0 0 6px;font-size:14px}
-  h2{margin:0;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
-  input{width:100%;background:#070918;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:17px;outline:none}
-  input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #00f0ff33}
-  #code{text-transform:uppercase;letter-spacing:6px;text-align:center;font-weight:800}
-  .btn{border:0;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:800;cursor:pointer;
-    background:#1a1f45;transition:transform .08s,filter .15s;touch-action:manipulation}
-  .btn:active{transform:scale(.97)}
-  .btn:disabled{opacity:.4;pointer-events:none}
-  .btn.cyan{background:var(--cyan);color:#001318;box-shadow:0 0 18px #00f0ff66}
-  .btn.pink{background:var(--pink);color:#1a0016;box-shadow:0 0 18px #ff2bd666}
-  .btn.ghost{background:transparent;border:1px solid var(--line)}
-  .row{display:flex;gap:10px}
-  .row>*{flex:1}
-  .seg{display:flex;gap:8px}
-  .seg button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:#070918;font-weight:800;cursor:pointer}
-  .seg button.on{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 10px #00f0ff44 inset}
-  .label{font-size:13px;color:var(--muted)}
-  .how{font-size:14px;color:var(--muted);line-height:1.5;margin:0;padding-left:18px}
-  .how b{color:var(--text)}
-  .invite{border-color:var(--yellow);box-shadow:0 0 14px #ffe60033}
-  .bigcode{font-size:46px;font-weight:900;letter-spacing:10px;text-align:center;color:var(--yellow);
-    text-shadow:0 0 14px #ffe60088;margin:0}
-  ul.players{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-  ul.players li{display:flex;align-items:center;gap:10px;background:#070918;border:1px solid var(--line);
-    border-left:4px solid var(--c);border-radius:10px;padding:10px 12px;font-weight:700}
-  ul.players li i{width:14px;height:14px;border-radius:3px;background:var(--c);box-shadow:0 0 10px var(--c)}
-  ul.players li span{flex:1}
-  ul.players li button{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
-  .hint{text-align:center;color:var(--muted);font-size:14px;margin:0}
-  .spinner{width:46px;height:46px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--cyan);
-    animation:spin 1s linear infinite;margin:0 auto}
-  @keyframes spin{to{transform:rotate(360deg)}}
-
-  /* Juego */
-  #game{padding:max(8px,env(safe-area-inset-top)) 8px max(10px,env(safe-area-inset-bottom));gap:8px;overflow:hidden}
-  #topbar{width:100%;max-width:640px;display:flex;align-items:center;gap:8px}
-  #hud{flex:1;display:flex;flex-wrap:wrap;gap:6px}
-  .chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);
-    border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;max-width:50%}
-  .chip i{width:10px;height:10px;border-radius:2px;background:var(--c);box-shadow:0 0 8px var(--c);flex:none}
-  .chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .chip b{color:var(--c)}
-  .chip.dead{opacity:.35}
-  .chip.me{border-color:var(--c)}
-  .iconbtn{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:38px;height:34px;
-    font-size:16px;cursor:pointer;flex:none}
-  #wrap{flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0;touch-action:none}
-  #cv{display:block;border:2px solid #2a3170;border-radius:6px;background:#04050c;
-    box-shadow:0 0 24px #00f0ff22,inset 0 0 30px #000}
-  #pad{width:100%;max-width:420px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;touch-action:none}
-  #pad button{height:64px;border-radius:14px;border:1px solid var(--line);background:var(--panel);
-    font-size:26px;cursor:pointer;touch-action:none}
-  #pad button:active,#pad button.hit{background:#1d2459;border-color:var(--cyan)}
-  .swipehint{font-size:12px;color:var(--muted);margin:0}
-
-  #overlay{position:fixed;inset:0;background:#05060fdd;backdrop-filter:blur(4px);display:none;
-    align-items:center;justify-content:center;padding:16px;z-index:5}
-  #overlay.show{display:flex}
-  #overlay .card{margin:0}
-  .trophy{font-size:64px;text-align:center;margin:0}
-  .winner{text-align:center;font-size:26px;font-weight:900;margin:0}
-  ol.rank{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
-  ol.rank li{display:flex;gap:10px;align-items:center;background:#070918;border-radius:10px;padding:10px 12px;font-weight:700;border-left:4px solid var(--c)}
-  ol.rank li span{flex:1}
-  ol.rank li b{color:var(--c);font-size:18px}
-
-  #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,40px);
-    background:#1a1f45;border:1px solid var(--line);padding:12px 16px;border-radius:12px;font-weight:700;
-    opacity:0;transition:.25s;z-index:10;max-width:90vw;text-align:center;pointer-events:none}
-  #toast.show{opacity:1;transform:translate(-50%,0)}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neón Arena</title>
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+<script src="vendor/peerjs.min.js"></script>
 </head>
 <body>
+<canvas id="scene"></canvas>
 
-<!-- MENÚ -->
-<section class="screen active" id="menu">
-  <div class="card">
-    <h1>NEÓN<br><span>DUELO</span></h1>
-    <p class="sub">Batalla de motos de luz · 1 a 4 jugadores</p>
-
-    <div class="box">
-      <h2>Tu nombre</h2>
-      <input id="name" maxlength="12" placeholder="Jugador" autocomplete="off">
-    </div>
-
-    <div class="box" id="joinBox">
-      <h2>Multijugador online</h2>
-      <button class="btn cyan" id="btnCreate">Crear sala</button>
-      <div class="row">
-        <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters">
-        <button class="btn pink" id="btnJoin" style="flex:.7">Unirse</button>
-      </div>
-    </div>
-
-    <div class="box">
-      <h2>Contra la máquina</h2>
-      <div class="label">Número de bots</div>
-      <div class="seg" id="botSeg">
-        <button data-n="1">1</button><button data-n="2">2</button><button data-n="3" class="on">3</button>
-      </div>
-      <button class="btn" id="btnSolo">Jugar ahora</button>
-    </div>
-
-    <div class="box">
-      <h2>Cómo se juega</h2>
-      <ul class="how">
-        <li>Tu moto deja un <b>muro de luz</b> detrás.</li>
-        <li>Si chocas con un muro o el borde, <b>quedas fuera</b>.</li>
-        <li>El último en pie gana la ronda. <b>Primero a 5</b> gana.</li>
-        <li>Gira <b>deslizando el dedo</b> sobre la pantalla o con los botones.</li>
-      </ul>
-    </div>
-    <div class="row"><button class="btn ghost" id="btnMute">🔊 Sonido</button></div>
+<!-- CARGA -->
+<div class="screen active" id="loading">
+  <div class="panel center">
+    <h1 class="logo">NEÓN<span>ARENA</span></h1>
+    <div class="bar"><i id="loadBar"></i></div>
+    <p class="muted" id="loadText">Cargando robots…</p>
   </div>
-</section>
+</div>
+
+<!-- MENÚ PRINCIPAL -->
+<div class="screen" id="menu">
+  <div class="menu-wrap">
+    <div class="menu-left">
+      <h1 class="logo big">NEÓN<span>ARENA</span></h1>
+      <p class="tag">Duelo de robots en una arena de neón · 1 a 8 jugadores</p>
+      <div class="field">
+        <label for="name">Nombre</label>
+        <input id="name" maxlength="14" placeholder="Jugador" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Color</label>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="btns">
+        <button class="btn primary" id="btnSolo">Jugar contra bots</button>
+        <button class="btn accent" id="btnCreate">Crear sala online</button>
+        <div class="join">
+          <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off">
+          <button class="btn" id="btnJoin">Unirse</button>
+        </div>
+      </div>
+    </div>
+    <div class="menu-right">
+      <div class="card">
+        <h3>Controles</h3>
+        <table class="keys">
+          <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Moverse</td></tr>
+          <tr><td><kbd>Ratón</kbd></td><td>Apuntar</td></tr>
+          <tr><td><kbd>Clic izq.</kbd></td><td>Disparar (mantén pulsado)</td></tr>
+          <tr><td><kbd>Espacio</kbd> / <kbd>Shift</kbd></td><td>Impulso (esquiva rápida)</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>Clasificación</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Pausa y opciones</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Objetos</h3>
+        <ul class="items">
+          <li><i style="--c:#39ff6a"></i><b>Vida</b> recupera 40 puntos</li>
+          <li><i style="--c:#ff6a1f"></i><b>Disparo triple</b> durante 8 s</li>
+          <li><i style="--c:#00e5ff"></i><b>Velocidad</b> durante 8 s</li>
+          <li><i style="--c:#8f5bff"></i><b>Escudo</b> reduce el daño un 60 %</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Opciones</h3>
+        <div class="opt"><label for="quality">Gráficos</label>
+          <select id="quality"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+        <div class="opt"><label for="volume">Volumen</label><input type="range" id="volume" min="0" max="1" step="0.05"></div>
+        <div class="opt"><label for="music">Música</label><input type="checkbox" id="music"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURAR PARTIDA SOLO -->
+<div class="screen" id="solo">
+  <div class="panel">
+    <h2>Partida contra bots</h2>
+    <div class="opt"><label>Bots</label><div class="seg" id="segBots"></div></div>
+    <div class="opt"><label>Dificultad</label><div class="seg" id="segDiff"></div></div>
+    <div class="opt"><label>Bajas para ganar</label><div class="seg" id="segKills"></div></div>
+    <div class="row">
+      <button class="btn ghost" data-back>Volver</button>
+      <button class="btn primary" id="btnSoloGo">¡A luchar!</button>
+    </div>
+  </div>
+</div>
 
 <!-- CONECTANDO -->
-<section class="screen" id="wait">
-  <div class="card">
+<div class="screen" id="wait">
+  <div class="panel center">
     <div class="spinner"></div>
-    <p class="hint" id="waitText">Conectando…</p>
-    <button class="btn ghost" id="btnCancel">Cancelar</button>
+    <p id="waitText">Conectando…</p>
+    <button class="btn ghost" data-back>Cancelar</button>
   </div>
-</section>
+</div>
 
 <!-- SALA -->
-<section class="screen" id="lobby">
-  <div class="card">
-    <h2 style="text-align:center">Código de la sala</h2>
-    <p class="bigcode" id="lobbyCode">-----</p>
-    <button class="btn cyan" id="btnShare">📨 Invitar amigos</button>
-    <div class="box">
-      <h2>Jugadores <span id="pCount"></span></h2>
-      <ul class="players" id="pList"></ul>
-      <div class="row" id="hostCtrls">
-        <button class="btn" id="btnAddBot">+ Bot</button>
-        <button class="btn pink" id="btnStart">¡Empezar!</button>
+<div class="screen" id="lobby">
+  <div class="panel wide">
+    <div class="lobby-head">
+      <div>
+        <div class="muted small">CÓDIGO DE SALA</div>
+        <div class="roomcode" id="roomCode">-----</div>
       </div>
-      <p class="hint" id="lobbyHint"></p>
+      <button class="btn accent" id="btnCopy">Copiar invitación</button>
     </div>
-    <button class="btn ghost" id="btnLeaveLobby">Salir de la sala</button>
+    <div class="lobby-body">
+      <div>
+        <h3>Jugadores <span class="muted" id="rosterCount"></span></h3>
+        <ul class="roster" id="roster"></ul>
+      </div>
+      <div class="lobby-side">
+        <h3>Ajustes</h3>
+        <div class="opt"><label>Dificultad de bots</label><div class="seg" id="lobDiff"></div></div>
+        <div class="opt"><label>Bajas para ganar</label><div class="seg" id="lobKills"></div></div>
+        <button class="btn" id="btnAddBot">+ Añadir bot</button>
+        <button class="btn primary" id="btnStart">Empezar partida</button>
+        <p class="muted small" id="lobbyHint"></p>
+      </div>
+    </div>
+    <div class="row"><button class="btn ghost" data-back>Salir de la sala</button></div>
   </div>
-</section>
+</div>
 
-<!-- JUEGO -->
-<section class="screen" id="game">
-  <div id="topbar">
-    <div id="hud"></div>
-    <button class="iconbtn" id="btnQuit" aria-label="Salir">✕</button>
+<!-- HUD -->
+<div id="hud" hidden>
+  <div id="killfeed"></div>
+  <div id="topcenter"><div id="timer">5:00</div><div class="muted small" id="goal"></div></div>
+  <div id="mini-board"></div>
+  <div id="announce"></div>
+  <div id="respawn" hidden><div>Has sido eliminado</div><b id="respawnT">3</b></div>
+  <div id="bottomleft">
+    <div id="powerups"></div>
+    <div class="hpwrap"><div id="hpbar"><i></i></div><b id="hpnum">100</b></div>
+    <div id="dash"><i></i><span>IMPULSO</span></div>
   </div>
-  <div id="wrap"><canvas id="cv"></canvas></div>
-  <p class="swipehint">Desliza sobre el tablero o usa los botones</p>
-  <div id="pad">
-    <button data-d="3" aria-label="Izquierda">◀</button>
-    <button data-d="0" aria-label="Arriba">▲</button>
-    <button data-d="2" aria-label="Abajo">▼</button>
-    <button data-d="1" aria-label="Derecha">▶</button>
-  </div>
-</section>
+  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="vignette"></div>
+  <div id="crosshair"></div>
+</div>
 
-<!-- RESULTADOS -->
-<div id="overlay">
-  <div class="card box">
-    <p class="trophy">🏆</p>
-    <p class="winner" id="winText"></p>
-    <ol class="rank" id="rank"></ol>
-    <p class="hint" id="overHint"></p>
-    <button class="btn cyan" id="btnAgain">Revancha</button>
-    <button class="btn ghost" id="btnMenu">Menú principal</button>
+<!-- CLASIFICACIÓN (Tab) -->
+<div id="scoreboard" hidden><div class="panel"><h2>Clasificación</h2><table id="scoreTable"></table></div></div>
+
+<!-- PAUSA -->
+<div class="screen overlay" id="pause">
+  <div class="panel">
+    <h2>Pausa</h2>
+    <div class="opt"><label for="quality2">Gráficos</label>
+      <select id="quality2"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+    <div class="opt"><label for="volume2">Volumen</label><input type="range" id="volume2" min="0" max="1" step="0.05"></div>
+    <div class="row">
+      <button class="btn ghost" id="btnLeave">Abandonar</button>
+      <button class="btn primary" id="btnResume">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIN -->
+<div class="screen overlay" id="end">
+  <div class="panel">
+    <div class="muted small center">FIN DE LA PARTIDA</div>
+    <h2 class="center" id="endTitle"></h2>
+    <table id="endTable"></table>
+    <p class="muted small center" id="endHint"></p>
+    <div class="row">
+      <button class="btn ghost" id="btnEndMenu">Menú</button>
+      <button class="btn primary" id="btnAgain">Revancha</button>
+    </div>
   </div>
 </div>
 
 <div id="toast"></div>
-
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>
-'use strict';
-// ================== Constantes ==================
-const W = 28, H = 42;             // tamaño del tablero (celdas)
-const WIN = 5;                    // puntos para ganar la partida
-const MAXP = 4;                   // jugadores máximos
-const PREFIX = 'neonduelo-v1-';   // prefijo de ID de PeerJS
-const COLORS = ['#00f0ff', '#ff2bd6', '#ffe600', '#3dff6e'];
-const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // arriba, derecha, abajo, izquierda
-const BOT_NAMES = ['Bot Rayo', 'Bot Pixel', 'Bot Turbo', 'Bot Chispa'];
-const SPAWNS = [
-  { x: Math.floor(W / 2), y: H - 4, dir: 0 },
-  { x: Math.floor(W / 2) - 1, y: 3, dir: 2 },
-  { x: 3, y: Math.floor(H / 2), dir: 1 },
-  { x: W - 4, y: Math.floor(H / 2) - 1, dir: 3 },
-];
-const $ = id => document.getElementById(id);
-
-// ================== Utilidades ==================
-function store(k, v) {
-  try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
-}
-function genCode() {
-  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)];
-  return s;
-}
-function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function toast(t) {
-  const el = $('toast'); el.textContent = t; el.classList.add('show');
-  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 3000);
-}
-function myName() { return ($('name').value.trim() || 'Jugador').slice(0, 12); }
-function vibrate(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
-function show(id) {
-  for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id);
-  if (id === 'game') requestAnimationFrame(resize);
-}
-function showWait(text) { $('waitText').textContent = text; show('wait'); }
-
-// ================== Sonido ==================
-let actx = null, muted = store('muted') === '1';
-function audio() {
-  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  if (actx && actx.state === 'suspended') actx.resume();
-  return actx;
-}
-function tone(f, d = 0.08, type = 'square', vol = 0.05, f2) {
-  if (muted) return; const a = audio(); if (!a) return;
-  try {
-    const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
-    o.type = type; o.frequency.setValueAtTime(f, t);
-    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + d);
-  } catch (e) {}
-}
-const sfx = {
-  count: () => tone(440, 0.12),
-  go: () => tone(880, 0.2),
-  boom: () => tone(300, 0.45, 'sawtooth', 0.07, 40),
-  win: () => { tone(523, .12); setTimeout(() => tone(659, .12), 120); setTimeout(() => tone(784, .25), 240); },
-  join: () => tone(660, 0.1, 'triangle', 0.08),
-};
-function renderMute() { $('btnMute').textContent = muted ? '🔇 Sonido: no' : '🔊 Sonido: sí'; }
-
-// ================== Estado de red ==================
-let mode = null;        // 'solo' | 'host' | 'guest'
-let peer = null, hostConn = null, roomCode = '', myIndex = 0;
-
-// ================== Lógica del anfitrión (autoridad del juego) ==================
-let HP = [];            // jugadores {name, conn, bot, x, y, dir, queue, alive, score}
-let HG = new Uint8Array(W * H);
-let hGen = 0, hTimer = null, hRound = 0, hTicks = 0, hPhase = 'lobby';
-
-function mkPlayer(name, conn, bot) { return { name, conn, bot, x: 0, y: 0, dir: 0, queue: [], alive: true, score: 0 }; }
-
-function emit(msg) {
-  for (const p of HP) if (p.conn && p.conn.open) { try { p.conn.send(msg); } catch (e) {} }
-  onMsg(msg);
-}
-
-function hostLobby() {
-  hPhase = 'lobby'; hGen++; clearTimeout(hTimer);
-  const players = HP.map((p, i) => ({ name: p.name, bot: p.bot, color: COLORS[i] }));
-  HP.forEach((p, i) => { if (p.conn && p.conn.open) p.conn.send({ t: 'lobby', players, you: i, code: roomCode }); });
-  onMsg({ t: 'lobby', players, you: 0, code: roomCode });
-}
-
-function hostStartMatch() {
-  if (HP.length < 2) return;
-  HP.forEach(p => p.score = 0);
-  hRound = 0; hPhase = 'playing';
-  startRound();
-}
-
-function startRound() {
-  const g = ++hGen; clearTimeout(hTimer);
-  hRound++; hTicks = 0; HG.fill(0);
-  const n = HP.length;
-  HP.forEach((p, i) => {
-    const s = SPAWNS[(i + hRound - 1) % n];
-    Object.assign(p, { x: s.x, y: s.y, dir: s.dir, queue: [], alive: true });
-    HG[p.y * W + p.x] = i + 1;
-  });
-  emit({ t: 'round', round: hRound, players: HP.map(p => ({ name: p.name, bot: p.bot, x: p.x, y: p.y, dir: p.dir, score: p.score })) });
-  hTimer = setTimeout(() => tick(g), 3000);
-}
-
-function tick(g) {
-  if (g !== hGen) return;
-  hTicks++;
-  const alive = HP.filter(p => p.alive);
-  for (const p of alive) {
-    if (p.bot) p.dir = botDir(p);
-    else {
-      while (p.queue.length) {
-        const d = p.queue.shift();
-        if (d !== p.dir && d !== (p.dir + 2) % 4) { p.dir = d; break; }
-      }
-    }
-    p.nx = p.x + DIRS[p.dir][0]; p.ny = p.y + DIRS[p.dir][1];
-  }
-  const cnt = {};
-  for (const p of alive) { const k = p.nx + ',' + p.ny; cnt[k] = (cnt[k] || 0) + 1; }
-  for (const p of alive) {
-    const out = p.nx < 0 || p.ny < 0 || p.nx >= W || p.ny >= H;
-    p.crash = out || HG[p.ny * W + p.nx] !== 0 || cnt[p.nx + ',' + p.ny] > 1;
-  }
-  for (const p of alive) {
-    if (p.crash) p.alive = false;
-    else { p.x = p.nx; p.y = p.ny; HG[p.y * W + p.x] = HP.indexOf(p) + 1; }
-  }
-  emit({ t: 'tick', h: HP.map(p => [p.x, p.y, p.alive ? 1 : 0]) });
-
-  const left = HP.filter(p => p.alive);
-  if (left.length <= 1) return endRound(g, left.length === 1 ? HP.indexOf(left[0]) : -1);
-  // Se acelera con el tiempo; si sólo quedan bots, avanza rápido
-  const humansAlive = left.some(p => !p.bot);
-  const ms = humansAlive ? Math.max(65, 115 - Math.floor(hTicks / 50) * 5) : 35;
-  hTimer = setTimeout(() => tick(g), ms);
-}
-
-function endRound(g, w) {
-  if (w >= 0) HP[w].score++;
-  const scores = HP.map(p => p.score);
-  emit({ t: 'roundEnd', winner: w, scores });
-  const champ = HP.findIndex(p => p.score >= WIN);
-  hTimer = setTimeout(() => {
-    if (g !== hGen) return;
-    if (champ >= 0) { hPhase = 'over'; emit({ t: 'matchEnd', winner: champ, scores }); }
-    else startRound();
-  }, 2600);
-}
-
-function hostInput(i, d) {
-  const p = HP[i];
-  if (!p || p.bot || !p.alive || hPhase !== 'playing') return;
-  if (!Number.isInteger(d) || d < 0 || d > 3) return;
-  const last = p.queue.length ? p.queue[p.queue.length - 1] : p.dir;
-  if (d === last || d === (last + 2) % 4) return;
-  if (p.queue.length < 3) p.queue.push(d);
-}
-
-// ---- IA de los bots: elige la dirección con más espacio libre ----
-const stamp = new Uint32Array(W * H), qbuf = new Int32Array(W * H);
-let stampId = 0;
-function isFree(x, y) { return x >= 0 && y >= 0 && x < W && y < H && HG[y * W + x] === 0; }
-function flood(sx, sy, limit) {
-  stampId++;
-  let h = 0, t = 0, c = 0;
-  qbuf[t++] = sy * W + sx; stamp[sy * W + sx] = stampId;
-  while (h < t && c < limit) {
-    const k = qbuf[h++]; c++;
-    const x = k % W, y = (k / W) | 0;
-    for (const [dx, dy] of DIRS) {
-      const nx = x + dx, ny = y + dy;
-      if (isFree(nx, ny)) {
-        const nk = ny * W + nx;
-        if (stamp[nk] !== stampId) { stamp[nk] = stampId; qbuf[t++] = nk; }
-      }
-    }
-  }
-  return c;
-}
-function botDir(p) {
-  let best = p.dir, bs = -Infinity;
-  for (const d of [p.dir, (p.dir + 1) % 4, (p.dir + 3) % 4]) {
-    const nx = p.x + DIRS[d][0], ny = p.y + DIRS[d][1];
-    if (!isFree(nx, ny)) continue;
-    let s = flood(nx, ny, 220);
-    for (const q of HP) if (q !== p && q.alive && Math.abs(q.x - nx) + Math.abs(q.y - ny) === 1) s -= 40;
-    if (d === p.dir) s += 4;
-    s += Math.random() * 6;
-    if (s > bs) { bs = s; best = d; }
-  }
-  return best;
-}
-
-// ================== Modos de juego ==================
-function cleanup() {
-  hGen++; clearTimeout(hTimer);
-  const oldPeer = peer, oldConn = hostConn;
-  peer = null; hostConn = null;
-  try { oldConn && oldConn.close(); } catch (e) {}
-  try { oldPeer && oldPeer.destroy(); } catch (e) {}
-  HP = []; mode = null; hPhase = 'lobby'; myIndex = 0;
-  V.state = 'idle'; V.players = [];
-  $('overlay').classList.remove('show');
-}
-
-function goMenu(msg) {
-  cleanup(); show('menu');
-  if (msg) toast(msg);
-  if (location.search) history.replaceState(null, '', location.pathname);
-}
-
-function startSolo(nBots) {
-  cleanup(); audio();
-  mode = 'solo'; myIndex = 0;
-  HP = [mkPlayer(myName(), null, false)];
-  for (let i = 0; i < nBots; i++) HP.push(mkPlayer(BOT_NAMES[i], null, true));
-  hostStartMatch();
-}
-
-function peerOk() {
-  if (window.Peer) return true;
-  toast('No se pudo cargar el modo online. Revisa tu conexión a internet.');
-  return false;
-}
-
-function createRoom() {
-  if (!peerOk()) return;
-  cleanup(); audio();
-  const code = genCode();
-  showWait('Creando sala…');
-  const p = new Peer(PREFIX + code, { debug: 0 });
-  peer = p;
-  p.on('open', () => {
-    if (peer !== p) return;
-    mode = 'host'; roomCode = code; myIndex = 0;
-    HP = [mkPlayer(myName(), null, false)];
-    hostLobby();
-  });
-  p.on('connection', conn => { if (peer === p) onGuestConn(conn); });
-  p.on('disconnected', () => { if (peer === p && !p.destroyed) { try { p.reconnect(); } catch (e) {} } });
-  p.on('error', e => {
-    if (peer !== p) return;
-    if (e.type === 'unavailable-id') return createRoom();
-    if (e.type === 'peer-unavailable') return; // un invitado se fue
-    if (mode !== 'host') goMenu('Error al crear la sala (' + e.type + ')');
-    else toast('Problema de conexión (' + e.type + ')');
-  });
-}
-
-function onGuestConn(conn) {
-  conn.on('data', m => {
-    if (!m || typeof m !== 'object' || mode !== 'host') return;
-    if (m.t === 'hello') {
-      if (HP.some(p => p.conn === conn)) return;
-      if (hPhase !== 'lobby') { conn.send({ t: 'busy' }); setTimeout(() => conn.close(), 600); return; }
-      if (HP.length >= MAXP) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 600); return; }
-      HP.push(mkPlayer(String(m.name || 'Jugador').slice(0, 12), conn, false));
-      sfx.join(); hostLobby();
-    } else if (m.t === 'dir') {
-      const i = HP.findIndex(p => p.conn === conn);
-      if (i >= 0) hostInput(i, m.d);
-    }
-  });
-  conn.on('close', () => dropConn(conn));
-  conn.on('error', () => dropConn(conn));
-}
-
-function dropConn(conn) {
-  const i = HP.findIndex(p => p.conn === conn);
-  if (i < 0) return;
-  const p = HP[i];
-  if (hPhase === 'lobby') { HP.splice(i, 1); hostLobby(); toast(p.name + ' salió de la sala'); }
-  else { p.conn = null; p.bot = true; toast(p.name + ' se desconectó: ahora lo controla un bot'); }
-}
-
-function joinRoom(raw) {
-  const code = raw.trim().toUpperCase();
-  if (code.length < 5) { toast('Escribe el código de 5 letras'); return; }
-  if (!peerOk()) return;
-  cleanup(); audio();
-  mode = 'guest';
-  showWait('Conectando a la sala ' + code + '…');
-  const p = new Peer({ debug: 0 });
-  peer = p;
-  const failT = setTimeout(() => {
-    if (peer === p && !(hostConn && hostConn.open)) goMenu('No se pudo conectar. ¿El código es correcto?');
-  }, 15000);
-  p.on('open', () => {
-    if (peer !== p) return;
-    const c = p.connect(PREFIX + code, { reliable: true });
-    hostConn = c;
-    c.on('open', () => { clearTimeout(failT); roomCode = code; c.send({ t: 'hello', name: myName() }); });
-    c.on('data', m => { if (hostConn === c && m && typeof m === 'object') onMsg(m); });
-    c.on('close', () => { if (hostConn === c) goMenu('Se perdió la conexión con el anfitrión'); });
-  });
-  p.on('error', e => {
-    if (peer !== p) return;
-    clearTimeout(failT);
-    goMenu(e.type === 'peer-unavailable' ? 'Sala no encontrada' : 'Error de conexión (' + e.type + ')');
-  });
-}
-
-function steer(d) {
-  if (V.state !== 'play' && V.state !== 'countdown') return;
-  if (mode === 'guest') { if (hostConn && hostConn.open) hostConn.send({ t: 'dir', d }); }
-  else hostInput(myIndex, d);
-}
-
-// ================== Vista (común a todos los jugadores) ==================
-const V = { players: [], grid: new Uint8Array(W * H), state: 'idle', cdEnd: 0, banner: '', bannerColor: '#fff', round: 0, lastCd: 0 };
-
-function onMsg(m) {
-  switch (m.t) {
-    case 'lobby':
-      myIndex = m.you; roomCode = m.code;
-      $('overlay').classList.remove('show');
-      V.state = 'idle';
-      renderLobby(m.players); show('lobby');
-      break;
-    case 'busy': goMenu('La partida ya empezó. Espera a que termine.'); break;
-    case 'full': goMenu('La sala está llena (máximo 4)'); break;
-    case 'round':
-      V.players = m.players.map((p, i) => ({ ...p, alive: true, color: COLORS[i] }));
-      V.grid.fill(0);
-      V.players.forEach((p, i) => V.grid[p.y * W + p.x] = i + 1);
-      V.round = m.round; V.state = 'countdown'; V.cdEnd = performance.now() + 3000; V.lastCd = 0;
-      V.banner = ''; particles.length = 0;
-      $('overlay').classList.remove('show');
-      show('game'); redrawTrails(); renderHud();
-      break;
-    case 'tick':
-      if (V.state === 'countdown') { V.state = 'play'; sfx.go(); }
-      m.h.forEach(([x, y, a], i) => {
-        const p = V.players[i]; if (!p) return;
-        if (a) {
-          if (p.x !== x || p.y !== y) { p.x = x; p.y = y; V.grid[y * W + x] = i + 1; drawCell(x, y, i); }
-        } else if (p.alive) {
-          p.alive = false; explode(p); sfx.boom();
-          if (i === myIndex) vibrate(250);
-          renderHud();
-        }
-      });
-      break;
-    case 'roundEnd':
-      V.state = 'roundEnd';
-      m.scores.forEach((s, i) => { if (V.players[i]) V.players[i].score = s; });
-      if (m.winner >= 0 && V.players[m.winner]) {
-        const w = V.players[m.winner];
-        V.banner = m.winner === myIndex ? '¡Ganaste la ronda!' : w.name + ' gana la ronda';
-        V.bannerColor = w.color;
-        if (m.winner === myIndex) sfx.win();
-      } else { V.banner = '¡Empate!'; V.bannerColor = '#ffffff'; }
-      renderHud();
-      break;
-    case 'matchEnd':
-      V.state = 'over';
-      m.scores.forEach((s, i) => { if (V.players[i]) V.players[i].score = s; });
-      showResults(m.winner);
-      break;
-  }
-}
-
-function renderLobby(players) {
-  $('lobbyCode').textContent = roomCode;
-  $('pCount').textContent = '(' + players.length + '/' + MAXP + ')';
-  $('pList').innerHTML = players.map((p, i) =>
-    `<li style="--c:${p.color}"><i></i><span>${esc(p.name)}${i === myIndex ? ' (tú)' : ''}${i === 0 ? ' 👑' : ''}</span>` +
-    (mode === 'host' && p.bot ? `<button data-rm="${i}" aria-label="Quitar">✕</button>` : '') + '</li>').join('');
-  const isHost = mode === 'host';
-  $('hostCtrls').style.display = isHost ? '' : 'none';
-  $('btnAddBot').disabled = players.length >= MAXP;
-  $('btnStart').disabled = players.length < 2;
-  $('lobbyHint').textContent = isHost
-    ? (players.length < 2 ? 'Comparte el código con tus amigos o añade bots' : '¡Todo listo! Pulsa Empezar cuando quieras')
-    : 'Esperando a que el anfitrión 👑 empiece la partida…';
-}
-
-function renderHud() {
-  $('hud').innerHTML = V.players.map((p, i) =>
-    `<div class="chip${p.alive ? '' : ' dead'}${i === myIndex ? ' me' : ''}" style="--c:${p.color}"><i></i><span>${esc(p.name)}</span><b>${p.score}</b></div>`).join('');
-}
-
-function showResults(w) {
-  const me = w === myIndex;
-  const wp = V.players[w];
-  $('winText').textContent = me ? '¡Has ganado la partida!' : (wp ? wp.name + ' gana la partida' : 'Fin de la partida');
-  $('winText').style.color = wp ? wp.color : '#fff';
-  $('rank').innerHTML = V.players.map((p, i) => ({ ...p, i }))
-    .sort((a, b) => b.score - a.score)
-    .map(p => `<li style="--c:${p.color}"><span>${esc(p.name)}${p.i === myIndex ? ' (tú)' : ''}</span><b>${p.score}</b></li>`).join('');
-  const canRestart = mode === 'host' || mode === 'solo';
-  $('btnAgain').style.display = canRestart ? '' : 'none';
-  $('overHint').textContent = canRestart ? '' : 'Esperando a que el anfitrión pida revancha…';
-  $('btnMenu').textContent = mode === 'solo' ? 'Menú principal' : 'Salir de la sala';
-  $('overlay').classList.add('show');
-  if (me) sfx.win();
-}
-
-// ================== Dibujo ==================
-const cv = $('cv'), ctx = cv.getContext('2d');
-const trail = document.createElement('canvas'), tctx = trail.getContext('2d');
-let cs = 10;
-const particles = [];
-
-function resize() {
-  const r = $('wrap').getBoundingClientRect();
-  cs = Math.max(4, Math.floor(Math.min((r.width - 4) / W, (r.height - 4) / H)));
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const pw = cs * W, ph = cs * H;
-  cv.style.width = pw + 'px'; cv.style.height = ph + 'px';
-  cv.width = trail.width = Math.round(pw * dpr);
-  cv.height = trail.height = Math.round(ph * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  redrawTrails();
-}
-
-function redrawTrails() {
-  const pw = cs * W, ph = cs * H;
-  tctx.clearRect(0, 0, pw, ph);
-  tctx.strokeStyle = '#11163a'; tctx.lineWidth = 1;
-  tctx.beginPath();
-  for (let x = 0; x <= W; x += 2) { tctx.moveTo(x * cs + .5, 0); tctx.lineTo(x * cs + .5, ph); }
-  for (let y = 0; y <= H; y += 2) { tctx.moveTo(0, y * cs + .5); tctx.lineTo(pw, y * cs + .5); }
-  tctx.stroke();
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = V.grid[y * W + x]; if (v) drawCell(x, y, v - 1);
-  }
-}
-
-function drawCell(x, y, i) {
-  tctx.globalAlpha = 0.8;
-  tctx.fillStyle = COLORS[i];
-  tctx.fillRect(x * cs, y * cs, cs, cs);
-  tctx.globalAlpha = 1;
-  tctx.fillStyle = '#ffffff55';
-  const m = cs * 0.35;
-  tctx.fillRect(x * cs + m, y * cs + m, cs - 2 * m, cs - 2 * m);
-}
-
-function explode(p) {
-  const cx = (p.x + .5) * cs, cy = (p.y + .5) * cs;
-  for (let k = 0; k < 36; k++) {
-    const a = Math.random() * Math.PI * 2, s = (1 + Math.random() * 4) * cs * 0.6;
-    particles.push({ x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, color: p.color });
-  }
-}
-
-let lastT = 0;
-function frame(t) {
-  requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
-  if (!$('game').classList.contains('active')) return;
-  const pw = cs * W, ph = cs * H;
-  ctx.clearRect(0, 0, pw, ph);
-  ctx.drawImage(trail, 0, 0, pw, ph);
-
-  // Cabezas
-  V.players.forEach((p, i) => {
-    if (!p.alive) return;
-    ctx.save();
-    ctx.shadowColor = p.color; ctx.shadowBlur = cs * 1.6;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(p.x * cs - 1, p.y * cs - 1, cs + 2, cs + 2);
-    ctx.restore();
-    if (i === myIndex && V.state === 'countdown') {
-      const pulse = 1.5 + Math.sin(t / 120) * 0.5;
-      ctx.strokeStyle = p.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc((p.x + .5) * cs, (p.y + .5) * cs, cs * pulse * 1.4, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = p.color; ctx.font = `900 ${Math.max(12, cs * 1.4)}px system-ui,sans-serif`;
-      ctx.textAlign = 'center';
-      const ty = p.y > H / 2 ? (p.y - 2.5) * cs : (p.y + 4) * cs;
-      ctx.fillText('TÚ', (p.x + .5) * cs, ty);
-      // flecha de dirección
-      const [dx, dy] = DIRS[p.dir];
-      ctx.beginPath();
-      ctx.moveTo((p.x + .5 + dx * 1.5) * cs, (p.y + .5 + dy * 1.5) * cs);
-      ctx.lineTo((p.x + .5 + dx * 3) * cs, (p.y + .5 + dy * 3) * cs);
-      ctx.stroke();
-    }
-  });
-
-  // Partículas
-  for (let k = particles.length - 1; k >= 0; k--) {
-    const q = particles[k];
-    q.x += q.vx * dt * 8; q.y += q.vy * dt * 8; q.vx *= 0.92; q.vy *= 0.92; q.life -= dt * 1.2;
-    if (q.life <= 0) { particles.splice(k, 1); continue; }
-    ctx.globalAlpha = q.life; ctx.fillStyle = q.color;
-    ctx.fillRect(q.x - cs * .25, q.y - cs * .25, cs * .5, cs * .5);
-  }
-  ctx.globalAlpha = 1;
-
-  // Textos
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (V.state === 'countdown') {
-    const n = Math.ceil((V.cdEnd - t) / 1000);
-    if (n > 0 && n !== V.lastCd) { V.lastCd = n; sfx.count(); }
-    bigText(n > 0 ? String(n) : '¡YA!', '#ffffff', pw, ph, 0.16);
-    smallText('Ronda ' + V.round, pw, ph * 0.5 + pw * 0.14);
-  } else if (V.state === 'roundEnd' && V.banner) {
-    bigText(V.banner, V.bannerColor, pw, ph, 0.075);
-  }
-}
-function bigText(s, color, pw, ph, k) {
-  ctx.save();
-  ctx.font = `900 ${Math.round(pw * k)}px system-ui,sans-serif`;
-  ctx.shadowColor = color; ctx.shadowBlur = 20; ctx.fillStyle = color;
-  ctx.fillText(s, pw / 2, ph / 2, pw * 0.92);
-  ctx.restore();
-}
-function smallText(s, pw, y) {
-  ctx.font = `700 ${Math.round(pw * 0.05)}px system-ui,sans-serif`;
-  ctx.fillStyle = '#8a90c0'; ctx.fillText(s, pw / 2, y);
-}
-requestAnimationFrame(frame);
-window.addEventListener('resize', () => { if ($('game').classList.contains('active')) resize(); });
-
-// ================== Controles ==================
-const KEYS = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
-window.addEventListener('keydown', e => {
-  if (!$('game').classList.contains('active')) return;
-  if (e.code in KEYS) { e.preventDefault(); steer(KEYS[e.code]); }
-});
-
-let sx = null, sy = null;
-const wrap = $('wrap');
-wrap.addEventListener('touchstart', e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
-wrap.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (sx === null) return;
-  const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) > 22) {
-    steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
-    sx = t.clientX; sy = t.clientY;
-  }
-}, { passive: false });
-wrap.addEventListener('touchend', () => { sx = null; });
-
-for (const b of document.querySelectorAll('#pad button')) {
-  b.addEventListener('pointerdown', e => {
-    e.preventDefault(); steer(+b.dataset.d);
-    b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 120);
-  });
-}
-document.addEventListener('gesturestart', e => e.preventDefault());
-
-// ================== Botones de menú ==================
-$('name').value = store('name') || '';
-$('name').addEventListener('input', () => store('name', $('name').value.trim()));
-let nBots = +(store('bots') || 3);
-function renderSeg() { for (const b of document.querySelectorAll('#botSeg button')) b.classList.toggle('on', +b.dataset.n === nBots); }
-document.querySelectorAll('#botSeg button').forEach(b => b.addEventListener('click', () => { nBots = +b.dataset.n; store('bots', nBots); renderSeg(); }));
-renderSeg(); renderMute();
-
-$('btnSolo').onclick = () => startSolo(nBots);
-$('btnCreate').onclick = createRoom;
-$('btnJoin').onclick = () => joinRoom($('code').value);
-$('code').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom($('code').value); });
-$('btnCancel').onclick = () => goMenu();
-$('btnLeaveLobby').onclick = () => goMenu();
-$('btnMute').onclick = () => { muted = !muted; store('muted', muted ? '1' : '0'); renderMute(); };
-$('btnAddBot').onclick = () => {
-  if (mode !== 'host' || HP.length >= MAXP) return;
-  const used = HP.map(p => p.name);
-  HP.push(mkPlayer(BOT_NAMES.find(n => !used.includes(n)) || 'Bot', null, true));
-  hostLobby();
-};
-$('pList').addEventListener('click', e => {
-  const b = e.target.closest('[data-rm]'); if (!b || mode !== 'host') return;
-  const i = +b.dataset.rm; if (HP[i] && HP[i].bot) { HP.splice(i, 1); hostLobby(); }
-});
-$('btnStart').onclick = () => { if (mode === 'host') hostStartMatch(); };
-$('btnShare').onclick = async () => {
-  const url = location.origin + location.pathname + '?sala=' + roomCode;
-  const text = '¡Juega conmigo a Neón Duelo! Sala: ' + roomCode;
-  try {
-    if (navigator.share) { await navigator.share({ title: 'Neón Duelo', text, url }); return; }
-  } catch (e) { if (e.name === 'AbortError') return; }
-  try { await navigator.clipboard.writeText(text + '\n' + url); toast('Enlace copiado ✔'); }
-  catch (e) { prompt('Copia este enlace:', url); }
-};
-$('btnQuit').onclick = () => {
-  if (mode === 'solo' || confirm(mode === 'host' ? '¿Salir? La sala se cerrará para todos.' : '¿Salir de la partida?')) goMenu();
-};
-$('btnAgain').onclick = () => {
-  if (mode === 'solo') hostStartMatch();
-  else if (mode === 'host') hostLobby();
-};
-$('btnMenu').onclick = () => goMenu();
-
-// Invitación por enlace (?sala=CODIGO)
-const invite = new URLSearchParams(location.search).get('sala');
-if (invite) {
-  $('code').value = invite.toUpperCase().slice(0, 5);
-  $('joinBox').classList.add('invite');
-  toast('Te invitaron a la sala ' + $('code').value + '. Pon tu nombre y pulsa Unirse');
-}
-</script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>
