@@ -7,6 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HALF, BOXES, PICKUP_SPOTS, PICKUP_INFO, CHARACTERS, MAX_HP } from './config.js';
 import { F } from './sim.js';
 
@@ -38,6 +39,65 @@ export function detectQuality() {
     if (/Intel/i.test(name)) return 'baja'; // UHD / Iris integradas
     return 'alta';
   } catch (e) { return 'media'; }
+}
+
+// Junta todas las piezas de un personaje en una sola malla con esqueleto, agrupada por material.
+// Un modelo de 19 piezas pasa a dibujarse en tantas llamadas como materiales tenga (3 en el robot).
+// Las piezas rígidas se atan al 100 % a su hueso; las que ya tenían esqueleto conservan sus pesos.
+function mergeCharacter(root) {
+  root.updateMatrixWorld(true);
+  const bones = [];
+  root.traverse(o => { if (o.isBone) bones.push(o); });
+  if (!bones.length) return false;
+  const boneIdx = new Map(bones.map((b, i) => [b, i]));
+  const rootInv = root.matrixWorld.clone().invert();
+  const byMat = new Map(), meshes = [];
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  root.traverse(o => { if (o.isMesh) meshes.push(o); });
+  for (const o of meshes) {
+    const src = o.geometry;
+    const n = src.attributes.position.count;
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+    const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    const toRoot = rootInv.clone().multiply(o.matrixWorld);
+    nm.getNormalMatrix(toRoot);
+    let bone = o.parent; while (bone && !bone.isBone) bone = bone.parent;
+    if (!o.isSkinnedMesh && !bone) return false; // pieza sin hueso: no se puede juntar
+    for (let i = 0; i < n; i++) {
+      v.fromBufferAttribute(src.attributes.position, i);
+      if (o.isSkinnedMesh) o.applyBoneTransform(i, v);
+      v.applyMatrix4(toRoot); v.toArray(pos, i * 3);
+      if (src.attributes.normal) { v.fromBufferAttribute(src.attributes.normal, i).applyMatrix3(nm).normalize(); v.toArray(nor, i * 3); }
+      if (o.isSkinnedMesh) {
+        for (let k = 0; k < 4; k++) {
+          const b = o.skeleton.bones[src.attributes.skinIndex.getComponent(i, k)];
+          si[i * 4 + k] = boneIdx.get(b) ?? 0;
+          sw[i * 4 + k] = src.attributes.skinWeight.getComponent(i, k);
+        }
+      } else { si[i * 4] = boneIdx.get(bone); sw[i * 4] = 1; }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+    if (src.index) g.setIndex(src.index.clone());
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.length > 1) return false;
+    if (!byMat.has(mats[0])) byMat.set(mats[0], []);
+    byMat.get(mats[0]).push(g);
+  }
+  const mats = [...byMat.keys()];
+  const geo = mergeGeometries(mats.map(m => mergeGeometries(byMat.get(m))), true);
+  if (!geo) return false;
+  for (const o of meshes) o.removeFromParent();
+  const mesh = new THREE.SkinnedMesh(geo, mats);
+  mesh.name = 'personaje';
+  root.add(mesh);
+  root.updateMatrixWorld(true);
+  mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
+  mesh.castShadow = true; mesh.frustumCulled = false;
+  return true;
 }
 
 export class Renderer {
@@ -86,6 +146,12 @@ export class Renderer {
     for (const c of CHARACTERS) {
       const gltf = await loader.loadAsync(c.url, e => e.total && onProgress && onProgress(e.loaded / e.total));
       const h = measureHeight(gltf.scene);
+      try {
+        if (mergeCharacter(gltf.scene)) {
+          // las expresiones faciales (morph targets) se pierden al juntar las piezas
+          for (const clip of gltf.animations) clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.morphTargetInfluences'));
+        }
+      } catch (e) { console.warn('No se pudo optimizar el modelo', c.id, e); }
       gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; } });
       this.chars[c.id] = { cfg: c, gltf, scale: c.scale || c.height / h };
     }
@@ -98,14 +164,16 @@ export class Renderer {
     this.quality = q;
     const potato = q === 'patata', cheap = q === 'baja' || potato;
     const dpr = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(q === 'alta' ? Math.min(dpr, 2) : potato ? 0.6 : 1);
+    // en patata se dibuja a como mucho 960 píxeles de ancho y se estira a pantalla completa
+    this.renderer.setPixelRatio(q === 'alta' ? Math.min(dpr, 2) : potato ? Math.min(0.5, 960 / window.innerWidth) : 1);
     this.renderer.shadowMap.enabled = !cheap;
     this.sun.castShadow = !cheap;
     this.useBloom = !cheap;
     for (const l of this.cornerLights) l.visible = !potato;
     this.hemi.intensity = potato ? 1.7 : 0.9; // compensa las luces que se quitan
     this.scene.environment = potato ? null : this.envTex;
-    this.particleScale = potato ? 0.35 : cheap ? 0.6 : 1;
+    this.particleScale = potato ? 0.25 : cheap ? 0.6 : 1;
+    this.floorTex.anisotropy = potato ? 1 : 8; this.floorTex.needsUpdate = true;
     this.scene.traverse(o => { if (o.isMesh) potato ? this.toLow(o) : this.toHigh(o); });
     this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
     this.resize();
@@ -114,18 +182,26 @@ export class Renderer {
 
   // Cambia un material realista (PBR) por uno mucho más barato de dibujar
   toLow(o) {
-    const m = o.material;
-    if (!m || !m.isMeshStandardMaterial) return;
+    if (o.userData.hiMat || !o.material) return;
+    const list = Array.isArray(o.material) ? o.material : [o.material];
+    if (!list.some(m => m.isMeshStandardMaterial)) return;
+    const lows = list.map(m => m.isMeshStandardMaterial ? this.lowOf(m, o.userData.flat) : m);
+    o.userData.hiMat = o.material;
+    o.material = Array.isArray(o.material) ? lows : lows[0];
+  }
+  lowOf(m, flat) {
     let low = this.lowMats.get(m);
     if (!low) {
-      low = new THREE.MeshLambertMaterial({
-        color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity,
-        transparent: m.transparent, opacity: m.opacity, side: m.side,
-      });
+      // suelo, muros y obstáculos: sin iluminación (lo más barato); personajes: iluminación simple
+      low = flat
+        ? new THREE.MeshBasicMaterial({ color: m.color.clone().multiplyScalar(m.map ? 1.6 : 1.3), map: m.map })
+        : new THREE.MeshLambertMaterial({
+          color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity,
+          transparent: m.transparent, opacity: m.opacity, side: m.side,
+        });
       this.lowMats.set(m, low);
     }
-    o.userData.hiMat = m;
-    o.material = low;
+    return low;
   }
   toHigh(o) {
     if (!o.userData.hiMat) return;
@@ -135,6 +211,7 @@ export class Renderer {
 
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
+    if (this.quality === 'patata') this.renderer.setPixelRatio(Math.min(0.5, 960 / w));
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
@@ -179,29 +256,40 @@ export class Renderer {
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, HALF * 2),
       new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.35, envMapIntensity: 0.15 }));
-    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; s.add(floor);
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.userData.flat = true; s.add(floor);
+    this.floorTex = tex;
     const outer = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: '#03040a' }));
     outer.rotation.x = -Math.PI / 2; outer.position.y = -0.02; s.add(outer);
 
     // muros perimetrales
     const wallMat = new THREE.MeshStandardMaterial({ color: '#12162e', metalness: 0.6, roughness: 0.4, envMapIntensity: 0.3 });
     const stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#00e5ff').multiplyScalar(1.3), toneMapped: false });
+    // la geometría fija se junta en pocas piezas: menos llamadas de dibujo por fotograma
+    const walls = [], strips = [];
     for (const [x, z, w, d] of [[0, -HALF - 0.5, HALF * 2 + 2, 1], [0, HALF + 0.5, HALF * 2 + 2, 1], [-HALF - 0.5, 0, 1, HALF * 2], [HALF + 0.5, 0, 1, HALF * 2]]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), wallMat); m.position.set(x, 0.6, z); m.receiveShadow = true; s.add(m);
-      const st = new THREE.Mesh(new THREE.BoxGeometry(w > 1 ? w : 0.18, 0.06, d > 1 ? d : 0.18), stripMat); st.position.set(x, 1.22, z); s.add(st);
+      walls.push(new THREE.BoxGeometry(w, 1.2, d).translate(x, 0.6, z));
+      strips.push(new THREE.BoxGeometry(w > 1 ? w : 0.18, 0.06, d > 1 ? d : 0.18).translate(x, 1.22, z));
     }
+    const wallMesh = new THREE.Mesh(mergeGeometries(walls), wallMat);
+    wallMesh.receiveShadow = true; wallMesh.userData.flat = true; s.add(wallMesh);
+    s.add(new THREE.Mesh(mergeGeometries(strips), stripMat));
 
     // obstáculos con bordes de neón
     const boxMat = new THREE.MeshStandardMaterial({ color: '#1b2040', metalness: 0.7, roughness: 0.35, envMapIntensity: 0.35 });
     const edgeCols = ['#ff2bd6', '#00e5ff', '#8f5bff'];
-    BOXES.forEach((b, i) => {
+    const boxGeos = [], edgeGeos = edgeCols.map(() => []);
+    for (const b of BOXES) {
       const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
-      const m = new THREE.Mesh(geo, boxMat);
-      m.position.set(b.x, b.h / 2, b.z); m.castShadow = m.receiveShadow = true; s.add(m);
-      const col = edgeCols[(Math.abs(Math.round(b.x)) + Math.abs(Math.round(b.z))) % 3];
-      const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
-        new THREE.LineBasicMaterial({ color: new THREE.Color(col).multiplyScalar(2.5), toneMapped: false }));
-      e.position.copy(m.position); s.add(e);
+      boxGeos.push(geo.clone().translate(b.x, b.h / 2, b.z));
+      const col = (Math.abs(Math.round(b.x)) + Math.abs(Math.round(b.z))) % 3;
+      edgeGeos[col].push(new THREE.EdgesGeometry(geo).translate(b.x, b.h / 2, b.z));
+    }
+    const boxMesh = new THREE.Mesh(mergeGeometries(boxGeos), boxMat);
+    boxMesh.castShadow = boxMesh.receiveShadow = true; boxMesh.userData.flat = true; s.add(boxMesh);
+    edgeGeos.forEach((list, i) => {
+      if (!list.length) return;
+      s.add(new THREE.LineSegments(mergeGeometries(list),
+        new THREE.LineBasicMaterial({ color: new THREE.Color(edgeCols[i]).multiplyScalar(2.5), toneMapped: false })));
     });
 
     // objetos (power-ups)
@@ -246,6 +334,7 @@ export class Renderer {
 
   burst(x, y, z, color, n, speed = 6, up = 3) {
     n = Math.max(1, Math.round(n * this.particleScale));
+    this.pAny = true;
     const c = new THREE.Color(color);
     for (let k = 0; k < n; k++) {
       const i = this.pIdx = (this.pIdx + 1) % this.pN;
@@ -258,6 +347,8 @@ export class Renderer {
   }
 
   updateParticles(dt) {
+    if (!this.pAny) return;
+    let any = false;
     for (let i = 0; i < this.pN; i++) {
       if (this.pLife[i] <= 0) continue;
       this.pLife[i] -= dt;
@@ -265,10 +356,11 @@ export class Renderer {
       this.pVel[i * 3 + 1] -= 9 * dt;
       for (let k = 0; k < 3; k++) { this.pPos[i * 3 + k] += this.pVel[i * 3 + k] * dt; this.pCol[i * 3 + k] = this.pBase[i * 3 + k] * l; }
       if (this.pPos[i * 3 + 1] < 0.05) { this.pPos[i * 3 + 1] = 0.05; this.pVel[i * 3 + 1] *= -0.4; this.pVel[i * 3] *= 0.7; this.pVel[i * 3 + 2] *= 0.7; }
-      if (l === 0) this.pPos[i * 3 + 1] = -100;
+      if (l === 0) this.pPos[i * 3 + 1] = -100; else any = true;
     }
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.color.needsUpdate = true;
+    this.pAny = any;
   }
 
   // ---------- Personajes ----------
@@ -278,17 +370,18 @@ export class Renderer {
     const root = new THREE.Group();
     const model = SkeletonUtils.clone(ch.gltf.scene);
     model.scale.setScalar(ch.scale);
-    model.traverse(o => {
-      if (!o.isMesh) return;
-      o.material = o.material.clone();
-      o.material.metalness = Math.min(o.material.metalness, 0.4);
-      o.material.roughness = Math.max(o.material.roughness, 0.35);
-      o.material.envMapIntensity = 0.6;
-      if (o.material.name === ch.cfg.tint) {
-        o.material.color = color.clone().multiplyScalar(0.8);
-        o.material.emissive = color.clone().multiplyScalar(0.35);
+    const tune = src => {
+      const m = src.clone();
+      m.metalness = Math.min(m.metalness, 0.4);
+      m.roughness = Math.max(m.roughness, 0.35);
+      m.envMapIntensity = 0.6;
+      if (m.name === ch.cfg.tint) {
+        m.color = color.clone().multiplyScalar(0.8);
+        m.emissive = color.clone().multiplyScalar(0.35);
       }
-    });
+      return m;
+    };
+    model.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(tune) : tune(o.material); });
     root.add(model);
 
     // cañón flotante en el hombro
@@ -363,8 +456,7 @@ export class Renderer {
     av.root.traverse(o => {
       if (!o.isMesh && !o.isSprite) return;
       o.geometry && o.geometry.dispose();
-      o.material.dispose && o.material.dispose();
-      if (o.userData.hiMat) o.userData.hiMat.dispose();
+      for (const m of [o.material, o.userData.hiMat].flat()) if (m && m.dispose) m.dispose();
     });
     av.tex.dispose();
     this.avatars.delete(id);
