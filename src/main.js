@@ -5,7 +5,7 @@ import {
   BULLET_R, MAX_HP, CHARACTERS,
 } from './config.js';
 import { Game, moveCircle, pointBlocked, F } from './sim.js';
-import { Renderer, detectQuality } from './render.js';
+import { Renderer } from './render.js';
 import { initAudio, sfx, setVolume, setMusic, startMusic, stopMusic } from './audio.js';
 
 const PREFIX = 'neonarena-v1-';
@@ -23,7 +23,7 @@ const prefs = {
   bots: +(store('na.bots') || 5),
   diff: store('na.diff') || 'normal',
   kills: +(store('na.kills') || 15),
-  quality: store('na.quality') || detectQuality(),
+  quality: store('na.quality') || 'alta',
   fps: store('na.fps') === '1',
   volume: store('na.volume') != null ? +store('na.volume') : 0.6,
   music: store('na.music') !== '0',

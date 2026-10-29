@@ -26,21 +26,6 @@ function measureHeight(root) {
   return (box.max.y - box.min.y) || 1;
 }
 
-// Calidad recomendada según la tarjeta gráfica (solo se usa la primera vez)
-export function detectQuality() {
-  try {
-    const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
-    if (!gl) return 'patata';
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    const name = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
-    if (/swiftshader|llvmpipe|softpipe|software/i.test(name)) return 'patata';
-    if (/Intel/i.test(name) && /(^|[^U])HD Graphics|Sandybridge|Ivybridge|Haswell|Bay ?Trail|GMA/i.test(name)) return 'patata';
-    if (/Intel/i.test(name)) return 'baja'; // UHD / Iris integradas
-    return 'alta';
-  } catch (e) { return 'media'; }
-}
-
 // Junta todas las piezas de un personaje en una sola malla con esqueleto, agrupada por material.
 // Un modelo de 19 piezas pasa a dibujarse en tantas llamadas como materiales tenga (3 en el robot).
 // Las piezas rígidas se atan al 100 % a su hueso; las que ya tenían esqueleto conservan sus pesos.

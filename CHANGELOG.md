@@ -4,9 +4,8 @@
 
 - Nueva calidad gráfica «Patata» para ordenadores antiguos sin tarjeta gráfica: menos resolución,
   materiales simples, sin sombras, brillo, luces extra ni reflejos, y menos partículas.
-- La primera vez, el juego elige la calidad según la tarjeta gráfica del ordenador.
+- La calidad por defecto es Alta; si el juego va a tirones, sugiere bajarla.
 - Opción para mostrar los FPS.
-- Aviso para bajar los gráficos si el juego va a tirones.
 - Optimización para todas las calidades: cada robot y la arena se dibujan en muchas menos pasadas
   (de unas 180 a 36 por fotograma), lo que reduce mucho el trabajo del procesador.
 
