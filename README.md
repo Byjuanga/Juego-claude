@@ -28,6 +28,7 @@ Se puede jugar **solo contra bots** o **online con hasta 8 personas**. Basta con
 - ⚡ **Impulso**: un acelerón rápido para esquivar disparos.
 - 🎨 **Gráficos 3D** con robots animados, sombras, brillo de neón y explosiones de partículas.
 - 🎵 **Música y efectos de sonido** generados en el propio navegador.
+- 💬 **Chat** en la partida (tecla T) y en la sala de espera.
 - 🗺️ Minimapa, lista de bajas, clasificación y avisos de racha («¡Doble eliminación!»).
 - 🎚️ Calidad gráfica ajustable para ordenadores menos potentes.
 
@@ -40,6 +41,7 @@ Se puede jugar **solo contra bots** o **online con hasta 8 personas**. Basta con
 | Clic izquierdo | Disparar (mantén pulsado) |
 | <kbd>Espacio</kbd> o <kbd>Shift</kbd> | Impulso |
 | <kbd>Tab</kbd> | Clasificación |
+| <kbd>T</kbd> o <kbd>Enter</kbd> | Chat |
 | <kbd>Esc</kbd> | Pausa y opciones |
 
 ## Cómo jugar con amigos

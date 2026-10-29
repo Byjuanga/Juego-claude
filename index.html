@@ -65,6 +65,7 @@
           <tr><td><kbd>Clic izq.</kbd></td><td>Disparar (mantén pulsado)</td></tr>
           <tr><td><kbd>Espacio</kbd> / <kbd>Shift</kbd></td><td>Impulso (esquiva rápida)</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>Clasificación</td></tr>
+          <tr><td><kbd>T</kbd> / <kbd>Enter</kbd></td><td>Chat</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Pausa y opciones</td></tr>
         </table>
       </div>
@@ -125,6 +126,11 @@
       <div>
         <h3>Jugadores <span class="muted" id="rosterCount"></span></h3>
         <ul class="roster" id="roster"></ul>
+        <h3 class="chat-title">Chat</h3>
+        <div class="lobby-chat">
+          <div id="lobbyChatLog"><p class="muted small" id="lobbyChatEmpty">Nadie ha escrito todavía. ¡Saluda!</p></div>
+          <input id="lobbyChatInput" maxlength="120" placeholder="Escribe un mensaje y pulsa Enter" autocomplete="off">
+        </div>
       </div>
       <div class="lobby-side">
         <h3>Ajustes</h3>
@@ -152,6 +158,11 @@
     <div id="dash"><i></i><span>IMPULSO</span></div>
   </div>
   <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="chat">
+    <div id="chatLog" aria-live="polite"></div>
+    <input id="chatInput" maxlength="120" placeholder="Escribe y pulsa Enter · Esc para cancelar" autocomplete="off" hidden>
+    <div id="chatHint"><kbd>T</kbd> Chat</div>
+  </div>
   <div id="vignette"></div>
   <div id="crosshair"></div>
 </div>

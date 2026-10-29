@@ -48,7 +48,11 @@ const view = { players: new Map(), bullets: [], pickups: PICKUP_SPOTS.map(() => 
 // ================== Entrada ==================
 const input = { keys: new Set(), mx: innerWidth / 2, my: innerHeight / 2, fire: false, dash: false, aim: 0 };
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' && e.target.offsetParent !== null) return; // escribiendo en un campo visible
+  if ((e.code === 'KeyT' || e.code === 'Enter') && !e.repeat) {
+    if ((S.phase === 'playing' || S.phase === 'over') && !$('pause').classList.contains('active')) { e.preventDefault(); openChat(); return; }
+    if (S.phase === 'lobby') { e.preventDefault(); $('lobbyChatInput').focus(); return; }
+  }
   input.keys.add(e.code);
   if (S.phase === 'playing' || S.phase === 'over') {
     if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') { input.dash = true; input.dashNet = true; e.preventDefault(); }
@@ -58,7 +62,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { input.keys.delete(e.code); if (e.code === 'Tab') $('scoreboard').hidden = true; });
 addEventListener('mousemove', e => { input.mx = e.clientX; input.my = e.clientY; const c = $('crosshair'); c.style.transform = `translate(${e.clientX}px,${e.clientY}px)`; });
-addEventListener('mousedown', e => { if (e.button === 0 && S.phase === 'playing' && !S.paused && !e.target.closest('.panel')) input.fire = true; });
+addEventListener('mousedown', e => { if (e.button === 0 && S.phase === 'playing' && !S.paused && !chatOpen && !e.target.closest('.panel')) input.fire = true; });
 addEventListener('mouseup', e => { if (e.button === 0) input.fire = false; });
 addEventListener('contextmenu', e => { if (S.phase === 'playing') e.preventDefault(); });
 addEventListener('blur', () => { input.keys.clear(); input.fire = false; });
@@ -277,6 +281,90 @@ function guestFrame(dt) {
   view.bullets = bl;
 }
 
+// ================== Chat ==================
+const CHAT_MAX = 120;
+const BOT_TAUNTS = ['¡Toma ya!', 'Demasiado lento 😎', '¿Eso es todo?', 'Bip bop, eliminado', 'Vuelve cuando practiques', '¡Zas!', 'Mis circuitos ni se han calentado', 'GG fácil'];
+const BOT_SALTY = ['Suerte...', 'Lag 😤', 'La próxima es mía', 'Error 404: puntería no encontrada', 'Eso no ha contado'];
+let chatOpen = false, lastChatSent = 0;
+
+function openChat() {
+  if (chatOpen) return;
+  chatOpen = true;
+  input.keys.clear(); input.fire = false;
+  const el = $('chatInput'); el.hidden = false; el.value = ''; el.focus();
+  $('chat').classList.add('open');
+  document.body.classList.remove('playing');
+  const log = $('chatLog'); log.scrollTop = log.scrollHeight;
+}
+function closeChat() {
+  if (!chatOpen) return;
+  chatOpen = false;
+  const el = $('chatInput'); el.blur(); el.hidden = true;
+  $('chat').classList.remove('open');
+  if (S.phase === 'playing') document.body.classList.add('playing');
+}
+
+function sendChat(raw) {
+  const text = String(raw || '').trim().slice(0, CHAT_MAX);
+  if (!text) return;
+  const now = performance.now();
+  if (now - lastChatSent < 500) return;
+  lastChatSent = now;
+  if (S.mode === 'guest') { if (S.hostConn && S.hostConn.open) S.hostConn.send({ t: 'chat', text }); }
+  else hostChat(S.myId, text);
+}
+
+// El anfitrión reparte los mensajes (también en solitario, para los bots)
+function hostChat(id, text) {
+  const r = S.roster.find(r => r.id === id);
+  if (!r) return;
+  const msg = { t: 'chat', id, name: r.name, color: r.color, text: String(text).slice(0, CHAT_MAX) };
+  if (S.mode === 'host') broadcast(msg);
+  addChat(msg);
+}
+function sysChat(text) {
+  const msg = { t: 'chat', sys: true, text };
+  if (S.mode === 'host') broadcast(msg);
+  addChat(msg);
+}
+
+function addChat(m) {
+  if (typeof m.text !== 'string') return;
+  const html = m.sys
+    ? esc(m.text)
+    : `<b style="color:${COLORS.includes(m.color) ? m.color : '#fff'}">${esc(String(m.name || '?').slice(0, 14))}:</b>${esc(m.text.slice(0, CHAT_MAX))}`;
+  for (const [id, keep] of [['chatLog', 30], ['lobbyChatLog', 50]]) {
+    const log = $(id);
+    const el = document.createElement('div');
+    el.className = 'line' + (m.sys ? ' sys' : '');
+    el.innerHTML = html;
+    log.append(el);
+    while (log.querySelectorAll('.line').length > keep) log.querySelector('.line').remove();
+    log.scrollTop = log.scrollHeight;
+    if (id === 'chatLog') setTimeout(() => el.classList.add('old'), 8000);
+  }
+  const empty = $('lobbyChatEmpty'); if (empty) empty.remove();
+  if (!m.sys && m.id !== S.myId) sfx.click();
+}
+
+function clearChat() {
+  $('chatLog').innerHTML = '';
+  $('lobbyChatLog').innerHTML = '<p class="muted small" id="lobbyChatEmpty">Nadie ha escrito todavía. ¡Saluda!</p>';
+  closeChat();
+}
+
+function botBanter(killer, victim) {
+  if (S.mode === 'guest') return;
+  const k = S.roster.find(r => r.id === killer), v = S.roster.find(r => r.id === victim);
+  if (!k || !v) return;
+  let id = null, lines = null;
+  if (k.bot && !v.bot && Math.random() < 0.35) { id = k.id; lines = BOT_TAUNTS; }
+  else if (v.bot && !k.bot && Math.random() < 0.15) { id = v.id; lines = BOT_SALTY; }
+  if (!id) return;
+  const mode = S.mode;
+  setTimeout(() => { if (S.mode === mode && S.phase === 'playing') hostChat(id, lines[Math.floor(Math.random() * lines.length)]); }, 700 + Math.random() * 900);
+}
+
 // ================== Eventos (sonido, efectos y textos) ==================
 const kf = [];
 let lastKillAt = 0, streak = 0, firstBlood = false;
@@ -295,6 +383,7 @@ function handleEvent(e) {
       sfx.kill();
       const k = nameOf(e.killer), v = nameOf(e.victim);
       addKillfeed(`<span style="color:${k.color}">${esc(k.name)}</span> ⚡ <span style="color:${v.color}">${esc(v.name)}</span>`, e.killer === S.myId || e.victim === S.myId);
+      botBanter(e.killer, e.victim);
       if (!firstBlood) { firstBlood = true; announce(e.killer === S.myId ? '¡Primera sangre!' : k.name + ': primera sangre'); }
       if (e.killer === S.myId) {
         sfx.myKill();
@@ -378,6 +467,7 @@ function renderScoreboard() {
 
 // ================== Flujo de partida ==================
 function enterGame() {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   S.phase = 'playing'; S.paused = false;
   view.victory = null; view.focus = null; view.players.clear(); view.bullets = [];
   firstBlood = false; streak = 0; $('killfeed').innerHTML = '';
@@ -406,7 +496,7 @@ function onEnd(msg) {
   $('btnEndMenu').textContent = S.mode === 'solo' ? 'Menú' : 'Salir de la sala';
   setTimeout(() => {
     if (S.phase !== 'over') return;
-    document.body.classList.remove('playing'); $('hud').hidden = true; show('end');
+    closeChat(); document.body.classList.remove('playing'); $('hud').hidden = true; show('end');
   }, 3500);
 }
 
@@ -426,6 +516,7 @@ function leave(msg) {
   try { hc && hc.close(); } catch (e) {}
   try { peer && peer.destroy(); } catch (e) {}
   S.mode = null; S.phase = 'menu'; S.game = null; S.roster = []; S.paused = false;
+  clearChat();
   resetGuestState();
   view.players.clear(); view.bullets = []; view.victory = null; view.focus = { x: 0, z: 0 };
   renderer.clearAll();
@@ -508,7 +599,7 @@ function acceptGuest(conn) {
       const r = { id, name: String(m.name || 'Jugador').slice(0, 14), color, bot: false, char: CHARACTERS[0].id };
       S.roster.push(r); S.conns.set(id, conn);
       sfx.spawn();
-      toast(r.name + ' se ha unido');
+      sysChat(r.name + ' se ha unido');
       if (S.phase === 'playing' || S.phase === 'over') {
         if (S.phase === 'playing') S.game.addPlayer(id, r.name, r.color, false);
         broadcast({ t: 'roster', roster: S.roster });
@@ -516,13 +607,19 @@ function acceptGuest(conn) {
       } else showLobby();
     } else if (m.t === 'in' && conn.pid && S.game) {
       S.game.setInput(conn.pid, m);
+    } else if (m.t === 'chat' && conn.pid && typeof m.text === 'string') {
+      const now = performance.now();
+      if (now - (conn.lastChat || 0) < 400) return;
+      conn.lastChat = now;
+      const text = m.text.trim().slice(0, CHAT_MAX);
+      if (text) hostChat(conn.pid, text);
     }
   });
   const drop = () => {
     if (!conn.pid || !S.conns.has(conn.pid)) return;
     S.conns.delete(conn.pid);
     const i = S.roster.findIndex(r => r.id === conn.pid);
-    if (i >= 0) { toast(S.roster[i].name + ' ha salido'); S.roster.splice(i, 1); }
+    if (i >= 0) { sysChat(S.roster[i].name + ' ha salido'); S.roster.splice(i, 1); }
     if (S.game) S.game.removePlayer(conn.pid);
     if (S.phase === 'lobby') showLobby(); else broadcast({ t: 'roster', roster: S.roster });
   };
@@ -578,6 +675,7 @@ function onHostData(m) {
       enterGame();
       break;
     case 'roster': S.roster = m.roster; break;
+    case 'chat': addChat(m); break;
     case 's': if (S.phase === 'playing') onSnapshot(m); break;
     case 'end': onEnd(m); break;
     case 'full': leave('La sala está llena (máximo ' + MAX_PLAYERS + ')'); break;
@@ -655,6 +753,17 @@ function wireMenus() {
     try { await navigator.clipboard.writeText(text); toast('Invitación copiada. Pégala en WhatsApp o Discord.'); }
     catch (e) { toast('Comparte este enlace: ' + url); }
   };
+  $('chatInput').addEventListener('keydown', e => {
+    e.stopPropagation(); // las teclas del chat no llegan al juego
+    if (e.key === 'Enter') { e.preventDefault(); sendChat($('chatInput').value); closeChat(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeChat(); }
+  });
+  $('chatInput').addEventListener('blur', () => setTimeout(closeChat, 0));
+  $('lobbyChatInput').addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); sendChat($('lobbyChatInput').value); $('lobbyChatInput').value = ''; }
+    else if (e.key === 'Escape') $('lobbyChatInput').blur();
+  });
   $('btnResume').onclick = togglePause;
   $('btnLeave').onclick = () => { $('pause').classList.remove('active'); leave(); };
   $('btnEndMenu').onclick = () => leave();
