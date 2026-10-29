@@ -20,9 +20,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
----
-
-Third-party content keeps its own license:
-- assets/models/RobotExpressive.glb: Tomás Laulhé (Quaternius), CC0 1.0.
-- vendor/three: three.js, MIT (vendor/three/LICENSE).
-- vendor/peerjs.min.js: PeerJS, MIT (vendor/PEERJS-LICENSE).

@@ -4,7 +4,7 @@
 
 **Shooter de arena en 3D para el navegador. Robots de neón, bots con IA y partidas online con tus amigos.**
 
-### [▶ JUGAR AHORA](https://byjuanga.github.io/neon-arena/)
+### [▶ JUGAR AHORA](https://byjuanga.github.io/Neon-arena/)
 
 Gratis, sin instalar nada y sin crear cuenta. Funciona en el navegador del ordenador.
 
@@ -44,7 +44,7 @@ Se puede jugar **solo contra bots** o **online con hasta 8 personas**. Basta con
 
 ## Cómo jugar con amigos
 
-1. Entra en **https://byjuanga.github.io/neon-arena/**, escribe tu nombre y elige un color.
+1. Entra en **https://byjuanga.github.io/Neon-arena/**, escribe tu nombre y elige un color.
 2. Pulsa **Crear sala online**. Te aparece un código de 5 letras, por ejemplo `K7MXQ`.
 3. Pulsa **Copiar invitación** y mándala por WhatsApp o Discord.
 4. Tus amigos abren el enlace y pulsan **Unirse**.
@@ -139,5 +139,6 @@ y abre http://localhost:8000
 
 ## Licencia
 
-El código del juego se publica bajo la [licencia MIT](LICENSE). El modelo del robot y las librerías incluidas
-conservan sus propias licencias, indicadas arriba.
+El código del juego se publica bajo la [licencia MIT](LICENSE). El contenido de terceros conserva su propia licencia:
+el modelo `assets/models/RobotExpressive.glb` es CC0 1.0, Three.js es MIT (`vendor/three/LICENSE`) y PeerJS es MIT
+(`vendor/PEERJS-LICENSE`).
